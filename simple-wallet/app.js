@@ -1,45 +1,38 @@
 const express = require('express');
-const app = express()
-require('dotenv').config();
-const morgan = require('morgan');
-const bodyParser = require('body-parser');
-const cors = require('cors');
+const app = express();
+const sequelize = require('./utils/database');
+const User = require('./models/user');
+const Wallet = require('./models/wallet');
+const ExchangeRate = require('./models/exchangeRate');
 
-const allowedMethods = ['GET', 'PUT', 'POST', 'DELETE'];
-const allowedHeaders = ['Authorization', 'Content-Type']
+// connect to database
+const databaseConnecting = async () => {
+    try {
+        await sequelize.sync({ force: true });
+        console.log('Connection has been established successfully.');
+    } catch (error) {
+        console.error('Unable to connect to the database:', error);
+    }
+}
 
-//middleware
-app.use(cors({
-    origin: '*',
-    methods: allowedMethods.join(', '),
-    allowedHeaders: allowedHeaders.join(', '),
-    credentials: true,
-    optionsSuccessStatus: 204
-}))
-app.use(morgan('tiny'));
-app.use(bodyParser.json());
-app.use(express.urlencoded({ extended: true}));
+databaseConnecting();
 
+// Middleware
+app.use(express.json());
 
-//API
+// API
+app.use('/user', require('./routes/userRoutes'));
+app.use('/admin', require('./routes/adminRoutes'))
+app.use('/user-wallet', require('./routes/userWalletRoutes'))
+app.use('/admin-wallet', require('./routes/adminWalletRoutes'))
 
-
-//test server
-app.get('/', (req,res) => {
-    res.status(200).send("start server")
+// Test server
+app.get('/', (req, res) => {
+    res.status(200).send("Server is running");
 });
 
+const PORT = process.env.PORT || 8000;
 
-
-
-
-
-
-
-
-
-
-const PORT = process.env.PORT
 app.listen(PORT, () => {
-    console.log(`server run on http://localhost:${PORT}`)
-})
+    console.log(`Server is running on http://localhost:${PORT}`);
+});
