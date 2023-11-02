@@ -11,4 +11,4 @@ router.delete('/:adminId', admin.deleteUser)
 
 
 
-module.exports = router
+module.exports = router 

@@ -60,10 +60,15 @@ exports.createUser = async (req, res) => {
 exports.updateUser = async (req, res) => {
     try {
         const userId = req.params.id;
-        const { username, password } = req.body;
+        const currentPassword = req.body.currentPassword;
+        const newPassword = req.body.newPassword
+        const reNewPassword = req.body.reNewPassword;
 
         if (!userId) {
             return res.status(400).json({ error: "User ID not provided" });
+        }
+        if (!currentPassword || !newPassword || !reNewPassword) {
+            return res.status(400).json({ error: "not provided and required" });
         }
 
         const user = await User.findByPk(userId);
@@ -72,17 +77,18 @@ exports.updateUser = async (req, res) => {
             return res.status(404).json({ error: "User not found" });
         }
 
-        if (username) {
-            user.username = username;
+        if (user.password !== currentPassword) {
+            return res.status(400).json({ error: "Password is incorrect" });
         }
 
-        if (password) {
-            user.password = password;
+        if (newPassword !== reNewPassword) {
+            return res.status(400).json({ error: "new password not matching" });
         }
+
+        user.password = newPassword
 
         await user.save();
-
-        return res.status(200).json(user);
+        return res.status(200).json("password changing completed");
     } catch (error) {
         console.error(error);
         return res.status(500).json({ error: 'Internal server error' });
