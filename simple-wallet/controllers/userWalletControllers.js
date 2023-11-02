@@ -5,17 +5,13 @@ const Wallet = require("../models/wallet");
 //get my wallet by userId
 exports.getMyWallet = async (req, res) => {
   try {
-    const username = req.params.username;
+    const userId = req.params.userId;
 
-    if (!username) {
-      return res.status(400).json({ error: "username not provided" });
+    if (!userId) {
+      return res.status(400).json({ error: "userId not provided" });
     }
 
-    const user = await User.findOne({
-      where: {
-        username: username,
-      },
-    });
+    const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -40,16 +36,13 @@ exports.getMyWallet = async (req, res) => {
 // Create user's wallet
 exports.createMyWallet = async (req, res) => {
   try {
-    const username = req.params.username;
-    if (!username) {
-      return res.status(400).json({ error: "username not provided" });
+    const userId = req.params.userId;
+    if (!userId) {
+      return res.status(400).json({ error: "userId not provided" });
     }
 
-    const user = await User.findOne({
-      where: {
-        wallet_name: username,
-      },
-    });
+    const user = await User.findByPk(userId);
+
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -65,7 +58,7 @@ exports.createMyWallet = async (req, res) => {
     }
 
     const newWallet = await Wallet.create({
-      wallet_name: username,
+      wallet_name: user.username,
     });
 
     return res.status(201).json(newWallet);
@@ -78,17 +71,15 @@ exports.createMyWallet = async (req, res) => {
 //update my wallet
 exports.addCurrencyIntoMyWallet = async (req, res) => {
     try {
-      const username = req.params.username;
-      const addCurrency = req.body.addCurrency.toUpperCase();
-      if (!username) {
-        return res.status(400).json({ error: "username not provided" });
+      const userId = req.params.userId;
+      const addCurrency = req.body.addCurrency;
+
+      if (!userId || !addCurrency) {
+        return res.status(400).json({ error: "userId or addCurrency not provided" });
       }
   
-      const user = await User.findOne({
-        where: {
-          wallet_name: username,
-        },
-      });
+      const user = await User.findByPk(userId);
+
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -103,7 +94,22 @@ exports.addCurrencyIntoMyWallet = async (req, res) => {
         return res.status(400).json({ error: "Your not have wallet" });
       }
      
-      myWallet.cryptocurrencies[addCurrency] = 0;
+      const newCurrency = addCurrency.toUpperCase();
+
+      const currencyAvailable = await ExchangeRate.findOne({
+        where: {
+          fromCurrency : newCurrency
+        }
+      })
+
+      if (!currencyAvailable) {
+        return res.status(400).json({error: `${newCurrency} not supported`})
+      }
+      myWallet.cryptocurrencies = {
+        ...myWallet.cryptocurrencies,
+        [newCurrency]: 0,
+      };
+
       await myWallet.save();
   
       return res.status(201).json(myWallet);
@@ -118,16 +124,22 @@ exports.addCurrencyIntoMyWallet = async (req, res) => {
 //deposit currency to my wallet
 exports.depositIntoMyWallet = async (req, res) => {
   try {
-    const username = req.params.username;
-    if (!username) {
-      return res.status(400).json({ error: "username not provided" });
+    const userId = req.params.userId;
+    const amount = req.body.amount;
+    const reqCurrency = req.body.currency;
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId not provided" });
     }
 
-    const user = await User.findOne({
-      where: {
-        username: username,
-      },
-    });
+    if (!amount || isNaN(amount) || !reqCurrency) {
+      return res.status(400).json({ error: "Invalid amount or currency" });
+    }
+
+    const currency = reqCurrency.toUpperCase();
+
+    const user = await User.findByPk(userId);
+
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -141,18 +153,16 @@ exports.depositIntoMyWallet = async (req, res) => {
     if (!userWallet) {
       return res.status(404).json({ error: "Your wallet not create" });
     }
+    const currencyAvailable = userWallet.cryptocurrencies[currency];
 
-    const amount = req.body.amount;
-    const currency = req.body.currency.toUpperCase();
-    if (!amount || isNaN(amount) || !currency) {
-      return res.status(400).json({ error: "Invalid amount or currency" });
+    if (currencyAvailable === undefined) {
+      return res.status(400).json({ error: "Currency not supported your wallet" });
     }
 
-    if (!userWallet.cryptocurrencies[currency]) {
-      return res.status(400).json({ error: "Currency not supported" });
-    }
-
-    userWallet.cryptocurrencies[currency] += parseFloat(amount);
+    userWallet.cryptocurrencies = {
+      ...userWallet.cryptocurrencies,
+      [currency]: (userWallet.cryptocurrencies[currency] || 0) + parseFloat(amount),
+    };
 
     await userWallet.save();
 
@@ -166,7 +176,7 @@ exports.depositIntoMyWallet = async (req, res) => {
 //transfer currency
 exports.transferWithExchangeRate = async (req, res) => {
     try {
-        const sender = req.params.username;
+        const sender = req.params.userId;
         const receiver = req.body.receiver;
         const fromCurrency = req.body.fromCurrency.toUpperCase();
         const toCurrency = req.body.toCurrency.toUpperCase();
@@ -176,11 +186,7 @@ exports.transferWithExchangeRate = async (req, res) => {
             return res.status(400).json({ error: 'Sender, receiver, fromCurrency, toCurrency, and amount are required' });
         }
 
-        const senderUser = await User.findOne({
-            where: {
-                username: sender 
-            }
-        })
+        const senderUser = await User.findByPk(sender)
 
         if (!senderUser) {
             return res.status(404).json({ error: 'Sender user not found' });
@@ -229,13 +235,20 @@ exports.transferWithExchangeRate = async (req, res) => {
             return res.status(400).json({ error: 'Insufficient balance in sender wallet' });
         }
 
-        senderWallet.cryptocurrencies[fromCurrency] -= parseFloat(amount);
-        receiverWallet.cryptocurrencies[toCurrency] = (receiverWallet.cryptocurrencies[toCurrency] || 0) + parseFloat(convertedAmount);
+        senderWallet.cryptocurrencies = {
+          ...senderWallet.cryptocurrencies,
+          [fromCurrency]: (senderWallet.cryptocurrencies[fromCurrency]) - parseFloat(amount),
+        };
+
+        receiverWallet.cryptocurrencies = {
+          ...receiverWallet.cryptocurrencies,
+          [toCurrency]: (receiverWallet.cryptocurrencies[toCurrency] || 0) + parseFloat(convertedAmount)
+        };
 
         await senderWallet.save();
         await receiverWallet.save();
 
-        return res.status(200).json(senderWallet);
+        return res.status(200).json({ senderWallet, receiverWallet });
 
     } catch (error) {
         console.error(error);

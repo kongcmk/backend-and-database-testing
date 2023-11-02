@@ -11,10 +11,7 @@ const Wallet = sequelize.define('Wallet', {
     cryptocurrencies: {
         type: DataTypes.JSON,
         allowNull: false,
-        defaultValue: {
-            BTC: 0.0,
-            ETH: 0.0,
-        }
+        defaultValue: {}
     },
     isDeactivatedWallet: {
         type: DataTypes.BOOLEAN,

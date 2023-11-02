@@ -98,7 +98,7 @@ exports.deleteUser = async (req, res) => {
             return res.status(400).json({ error: "User ID not provided" });
         }
 
-        const user = await User.findOOne({
+        const user = await User.findOne({
             where: {
                 id: userId,
                 isDeactivated: false

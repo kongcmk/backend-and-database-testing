@@ -5,20 +5,16 @@ const Wallet = require("../models/wallet");
 
 exports.getAllWallet = async (req, res) => {
     try {
-        const adminUsername = req.params.admin;
-
-        const admin = await User.findOne({
-            where: {
-              username: adminUsername,
-              isAdmin: true,
-            },
-          });
-      
-          if (!adminUsername || !admin) {
-            return res.status(400).json({ error: "You not admin" });
+        const adminId = req.params.adminId;
+          if (!adminId) {
+            return res.status(400).json({ error: "You not admin or not provided" });
           }
 
-
+        const admin = await User.findByPk(adminId);
+      
+        if (admin.isAdmin !== true) {
+            return res.status(400).json({ error: "You not admin"})
+        }
         const walletList = await Wallet.findAll()
         res.status(200).json(walletList)
     } catch (error) {
@@ -30,24 +26,25 @@ exports.getAllWallet = async (req, res) => {
 // increase 
 exports.increaseCurrencyBalance = async (req, res) => {
     try {
-        const adminUsername = req.params.admin;
+        const adminId = req.params.adminId;
         const username = req.body.username;
-        const currency = req.body.currency.toUppercase();
+        const reqCurrency = req.body.currency;
         const amount = req.body.amount;
 
-        const admin = await User.findOne({
-            where: {
-              username: adminUsername,
-              isAdmin: true,
-            },
-          });
-      
-          if (!adminUsername || !admin) {
-            return res.status(400).json({ error: "You not admin" });
+        if (!adminId) {
+            return res.status(400).json({ error: "You not admin or not provided" });
           }
 
-        if (!username || !currency || !amount) {
+        if (!username || !reqCurrency || !amount) {
             return res.status(400).json({ error: "Username, currency, and amount are required" });
+        }
+
+        const currency = reqCurrency.toUppercase();
+
+        const admin = await User.findByPk(adminId);
+      
+        if (!admin) {
+            return res.status(400).json({ error: "You not admin" });
         }
 
         const userWallet = await Wallet.findOne({
@@ -154,75 +151,69 @@ exports.getTotalCurrencyBalance = async (req, res) => {
 // add exchange rate 
 exports.addCurrency = async (req, res) => {
     try {
-        const adminUsername = req.params.admin;
-        const fromCurrency = req.body.fromCurrency;
-        const toCurrency = req.body.toCurrency;
-        const rate = req.body.rate;
-        const admin = await User.findOne({
-            where: {
-              username: adminUsername,
-              isAdmin: true,
-            },
-          });
-      
-          if (!adminUsername || !admin) {
-            return res.status(400).json({ error: "You not admin" });
-          }
-
-        if (!fromCurrency || !toCurrency) {
-            return res.status(400).json({ error: "currency is required" });
-        }
-
-        const existingCurrency = await ExchangeRate.findOne({
-            where: {
-                fromCurrency: fromCurrency,
-                toCurrency: toCurrency
-            }
-        });
-
-        if (existingCurrency) {
-            return res.status(400).json({ error: "Currency already exists" });
-        }
-
-        await ExchangeRate.create({
-            fromCurrency: fromCurrency,
-            toCurrency: toCurrency,
-            rate: rate,
-        });
-
-        return res.status(201).json({ message: "Currency added successfully" });
+      const adminId = req.params.adminId;
+      const fromCurrency = req.body.fromCurrency;
+      const toCurrency = req.body.toCurrency;
+      const rate = req.body.rate;
+      const admin = await User.findByPk(adminId);
+  
+      if (!adminId || !admin) {
+        return res.status(400).json({ error: "You are not an admin" });
+      }
+  
+      if (!fromCurrency || !toCurrency || !rate) {
+        return res.status(400).json({ error: "Currency is required" });
+      }
+  
+      const newFromCurrency = fromCurrency.toUpperCase();
+      const newToCurrency = toCurrency.toUpperCase();
+  
+      const existingCurrency = await ExchangeRate.findOne({
+        where: {
+          fromCurrency: newFromCurrency,
+          toCurrency: newToCurrency,
+        },
+      });
+  
+      if (existingCurrency) {
+        return res.status(400).json({ error: "Currency already exists" });
+      }
+  
+      const newExchangeRate = await ExchangeRate.create({
+        fromCurrency: newFromCurrency,
+        toCurrency: newToCurrency,
+        rate: rate,
+      });
+  
+      return res.status(201).json({ message: "Currency added successfully", newExchangeRate });
     } catch (error) {
-        console.error(error);
-        return res.status(500).json({ error: "Internal server error" });
+      console.error(error);
+      return res.status(500).json({ error: "Internal server error" });
     }
-};
+  };
+  
 
 // update exchange rate
 exports.updateCurrency = async (req, res) => {
     try {
-        const adminUsername = req.params.admin;
+        const adminId = req.params.adminId;
         const fromCurrency = req.body.fromCurrency;
         const toCurrency = req.body.toCurrency;
         const rate = req.body.rate;
-        const admin = await User.findOne({
-            where: {
-              username: adminUsername,
-              isAdmin: true,
-            },
-          });
+        const admin = await User.findByPk(adminId);
       
           if (!adminUsername || !admin) {
             return res.status(400).json({ error: "You not admin" });
           }
 
-        if (!fromCurrency || !toCurrency) {
+        if (!fromCurrency || !toCurrency || !rate) {
             return res.status(400).json({ error: "currency is required" });
         }
 
         const currentCurrency = await ExchangeRate.findOne({
             where: {
-                fromCurrency: fromCurrency,
-                toCurrency: toCurrency
+                fromCurrency: fromCurrency.toUppercase(),
+                toCurrency: toCurrency.toUppercase()
             }
         });
 
@@ -240,3 +231,21 @@ exports.updateCurrency = async (req, res) => {
         return res.status(500).json({ error: "Internal server error" });
     }
 };
+
+// get exchange rate all
+exports.getAllExchangeRate = async (req, res) => {
+    try {
+        const adminId = req.params.adminId;
+        const admin = await User.findByPk(adminId);
+      
+          if (!adminId || !admin) {
+            return res.status(400).json({ error: "You not admin" });
+          }
+
+        const exchangeRateList = await ExchangeRate.findAll()
+        res.status(200).json(exchangeRateList)
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: "Internal server error" });
+    }
+}

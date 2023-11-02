@@ -11,7 +11,7 @@ const ExchangeRate = sequelize.define('ExchangeRate', {
         allowNull: false,
     },
     rate: {
-        type: DataTypes.DECIMAL(10,5),
+        type: DataTypes.NUMBER,
         allowNull: false,
     },
     updatedAt: {
